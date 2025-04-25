@@ -15,7 +15,7 @@
                 class="w-full p-3 border rounded-lg text-right"
             />
             <input
-                v-model="form.date"
+                v-model="form.record_date "
                 type="date"
                 class="w-full p-3 border rounded-lg text-right"
             />
@@ -31,7 +31,11 @@
                 <input type="file" multiple class="hidden" ref="fileInput" @change="handleFiles" />
             </div>
 
-            <div v-for="(file, index) in files" :key="index" class="flex items-center justify-between bg-green-100 p-2 rounded-md">
+            <div
+                v-for="(file, index) in files"
+                :key="index"
+                class="flex items-center justify-between bg-green-100 p-2 rounded-md"
+            >
                 <div class="text-right text-sm truncate w-4/5">{{ file.name }}</div>
                 <div class="flex gap-2">
                     <button class="text-blue-600" @click="viewFile(file)">🔍</button>
@@ -50,17 +54,15 @@
 </template>
 
 <script setup>
-import { ref,onMounted  } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 const route = useRoute()
 const documentId = route.params.medical_id
 
-
-
 const form = ref({
     title: '',
     description: '',
-    date: '',
+    record_date : '',
 })
 
 const files = ref([])
@@ -71,49 +73,90 @@ const pickFiles = () => {
 }
 
 const handleFiles = (e) => {
-    files.value = [...files.value, ...Array.from(e.target.files)]
+    const selectedFiles = Array.from(e.target.files).map(file => ({
+        name: file.name,
+        file,
+        isNew: true
+    }))
+    files.value.push(...selectedFiles)
 }
 
-const removeFile = (index) => {
+const removeFile = async (index) => {
+    const file = files.value[index]
+
+    if (!file.isNew && file.id) {
+        try {
+            await fetch(`http://localhost/api/medical-files/${file.id}`, {
+                method: 'DELETE',
+            })
+        } catch (error) {
+            alert('خطا در حذف فایل از سرور')
+            return
+        }
+    }
+
     files.value.splice(index, 1)
 }
 
 const viewFile = (file) => {
-    const url = URL.createObjectURL(file)
-    window.open(url, '_blank')
+    if (file.isNew) {
+        const url = URL.createObjectURL(file.file)
+        window.open(url, '_blank')
+    } else {
+        window.open(file.url, '_blank')
+    }
 }
 
 onMounted(async () => {
     const res = await fetch(`http://localhost/api/medical-documents/${documentId}`)
-    const data = await res.json()
+    const json = await res.json()
+    const data = json.data
 
     form.value.title = data.title
     form.value.description = data.description
-    form.value.date = data.date
+    form.value.record_date  = data.record_date
 
+    if (data.files) {
+        files.value = data.files.map(file => ({
+            id: file.id,
+            name: file.original_name,
+            url: file.file_path,
+            isNew: false
+        }))
+    }
 })
-    const submitForm = async () => {
-    const formData = new FormData()
-    formData.append('title', form.value.title)
-    formData.append('description', form.value.description)
-    formData.append('date', form.value.date)
-    files.value.forEach((file) => {
-        formData.append('files[]', file)
-    })
-    formData.append('_method', 'PUT')
+
+const submitForm = async () => {
+    const formData = new FormData();
+    formData.append('title', form.value.title.trim());
+    formData.append('description', form.value.description.trim());
+    formData.append('record_date', form.value.record_date.trim());
+
+    files.value.forEach(file => {
+        if (file.isNew && file.file) {
+            formData.append('files[]', file.file);
+        }
+    });
 
     try {
-        const res = await fetch(`http://localhost:8000/api/medical-documents/${documentId}`, {
-            method: 'POST',
+        const res = await fetch(`http://localhost/api/medical-documents/${documentId}`, {
+            method: 'PATCH',
             body: formData,
-        })
-        const data = await res.json()
-        alert('با موفقیت ویرایش شد!')
+        });
+
+        if (!res.ok) {
+            const errorData = await res.json();
+            console.error('Server Validation Errors:', errorData);
+            alert(`Error: ${JSON.stringify(errorData)}`);
+        } else {
+            const data = await res.json();
+            alert('با موفقیت ویرایش شد!');
+        }
     } catch (error) {
-        console.error('خطا در ویرایش:', error)
-        alert('ویرایش انجام نشد.')
+        console.error('خطا در ویرایش:', error);
+        alert('ارتباط با سرور برقرار نشد.');
     }
-}
+};
 </script>
 
 <style scoped>
