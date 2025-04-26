@@ -15,7 +15,7 @@
                 class="w-full p-3 border rounded-lg text-right"
             />
             <input
-                v-model="form.record_date "
+                v-model="form.record_date"
                 type="date"
                 class="w-full p-3 border rounded-lg text-right"
             />
@@ -86,7 +86,7 @@ const removeFile = async (index) => {
 
     if (!file.isNew && file.id) {
         try {
-            await fetch(`http://localhost/api/medical-files/${file.id}`, {
+            await fetch(`http://localhost:8000/api/medical-files/${file.id}`, {
                 method: 'DELETE',
             })
         } catch (error) {
@@ -108,7 +108,7 @@ const viewFile = (file) => {
 }
 
 onMounted(async () => {
-    const res = await fetch(`http://localhost/api/medical-documents/${documentId}`)
+    const res = await fetch(`http://localhost:8000/api/medical-documents/${documentId}`)
     const json = await res.json()
     const data = json.data
 
@@ -127,36 +127,39 @@ onMounted(async () => {
 })
 
 const submitForm = async () => {
-    const formData = new FormData();
-    formData.append('title', form.value.title.trim());
-    formData.append('description', form.value.description.trim());
-    formData.append('record_date', form.value.record_date.trim());
+    const formData = new FormData()
+    formData.append('title', form.value.title)
+    formData.append('description', form.value.description)
+    formData.append('record_date', form.value.record_date?.trim() || '')
 
-    files.value.forEach(file => {
-        if (file.isNew && file.file) {
-            formData.append('files[]', file.file);
+    for (const file of files.value) {
+        if (file.isNew && file.file instanceof File) {
+            formData.append('files[]', file.file)
         }
-    });
+    }
 
     try {
-        const res = await fetch(`http://localhost/api/medical-documents/${documentId}`, {
-            method: 'PATCH',
+        const res = await fetch(`http://localhost:8000/api/medical-documents/${documentId}`, {
+            method: 'POST',
+            headers: {
+                'X-HTTP-Method-Override': 'PUT',
+            },
             body: formData,
-        });
+        })
 
         if (!res.ok) {
-            const errorData = await res.json();
-            console.error('Server Validation Errors:', errorData);
-            alert(`Error: ${JSON.stringify(errorData)}`);
+            const errorData = await res.json()
+            console.error('Server Validation Errors:', errorData)
+            alert(`خطا در ارسال: ${JSON.stringify(errorData, null, 2)}`)
         } else {
-            const data = await res.json();
-            alert('با موفقیت ویرایش شد!');
+            const data = await res.json()
+            alert('با موفقیت ویرایش شد!')
         }
     } catch (error) {
-        console.error('خطا در ویرایش:', error);
-        alert('ارتباط با سرور برقرار نشد.');
+        console.error('خطا در ویرایش:', error)
+        alert('ارتباط با سرور برقرار نشد.')
     }
-};
+}
 </script>
 
 <style scoped>
