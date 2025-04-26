@@ -33,7 +33,7 @@ const router = useRouter()
 
 onMounted(async () => {
   try {
-    const res = await fetch('http://localhost/api/medical-documents')
+    const res = await fetch('http://localhost:8000/api/medical-documents')
     const data = await res.json()
     documents.value = data.data
   } catch (err) {
